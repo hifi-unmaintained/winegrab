@@ -22,39 +22,29 @@
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
 
-/* keyboard grabbing is broken, events sent to wrong window */
-#define GRAB_KEYBOARD 0
+#define WINDOW_NAME "Default - Wine desktop"
+#define RELEASE_KEY XK_Alt_L
 
 #define MAX_PROPERTY_VALUE_LEN 4096
 
 Display *display;
-Window root;
 Window window;
 
 void grab(int grab)
 {
     if(grab)
     {
-        if(XGrabPointer(display, window, False, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync, GrabModeAsync, window, None, CurrentTime) != GrabSuccess)
-        {
-            fprintf(stderr, "Warning: XGrabPointer failed\n");
-        }
-#if GRAB_KEYBOARD
-        if(XGrabKeyboard(display, window, False, GrabModeAsync, GrabModeAsync, CurrentTime) != GrabSuccess)
-        {
-            fprintf(stderr, "Warning: XGrabKeyboard failed\n");
-        }
-#endif
+        XGrabPointer(display, window, True, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
+        XGrabKey(display, XKeysymToKeycode(display, RELEASE_KEY), AnyModifier, window, False, GrabModeAsync, GrabModeAsync);
     } else {
         XUngrabPointer(display, CurrentTime);
-#if GRAB_KEYBOARD
-        XUngrabKeyboard(display, CurrentTime);
-#endif
+        XUngrabKey(display, XKeysymToKeycode(display, RELEASE_KEY), AnyModifier, window);
     }
 }
 
 int main(int argc, char **argv)
 {
+    Window root;
     XEvent event;
 
     int i;
@@ -88,7 +78,7 @@ int main(int argc, char **argv)
     window = 0;
     for(i=0;i < size / sizeof(Window);i++) {
         XFetchName(display, client_list[i], &window_name);
-        if(strcmp(window_name, "Default - Wine desktop") == 0) {
+        if(strcmp(window_name, WINDOW_NAME) == 0) {
             window = client_list[i];
             XFree(window_name);
             break;
@@ -128,30 +118,10 @@ int main(int argc, char **argv)
         {
             XSendEvent(display, window, True, ButtonReleaseMask, &event);
         }
-#if GRAB_KEYBOARD
         else if(event.type == KeyPress)
         {
-            XSendEvent(display, window, True, KeyPressMask, &event);
-            if(XKeycodeToKeysym(display, event.xkey.keycode, 0) == XK_Alt_L)
-            {
-                grab(0);
-            }
+            grab(0);
         }
-        else if(event.type == KeyRelease)
-        {
-            XSendEvent(display, window, True, KeyPressMask, &event);
-            if(XKeycodeToKeysym(display, event.xkey.keycode, 0) == XK_Alt_L)
-            {
-                grab(1);
-            }
-        }
-#endif
-        else
-        {
-            fprintf(stderr, "Warning: Unhandled event.type: %d\n", event.type);
-        }
-
-        XFlush(display);
     } while(1);
 
     return 0;
