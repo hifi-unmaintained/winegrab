@@ -22,23 +22,21 @@
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
 
-#define WINDOW_NAME "Default - Wine desktop"
-#define RELEASE_KEY XK_Alt_L
-
 #define MAX_PROPERTY_VALUE_LEN 4096
 
 Display *display;
 Window window;
+int release_key = XK_Alt_L;
 
 void grab(int grab)
 {
     if(grab)
     {
         XGrabPointer(display, window, True, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
-        XGrabKey(display, XKeysymToKeycode(display, RELEASE_KEY), AnyModifier, window, False, GrabModeAsync, GrabModeAsync);
+        XGrabKey(display, XKeysymToKeycode(display, release_key), AnyModifier, window, False, GrabModeAsync, GrabModeAsync);
     } else {
         XUngrabPointer(display, CurrentTime);
-        XUngrabKey(display, XKeysymToKeycode(display, RELEASE_KEY), AnyModifier, window);
+        XUngrabKey(display, XKeysymToKeycode(display, release_key), AnyModifier, window);
     }
 }
 
@@ -56,6 +54,13 @@ int main(int argc, char **argv)
     int ret_format;
     unsigned long ret_nitems;
     unsigned long ret_bytes_after;
+    char desktop_window[256];
+
+    snprintf(desktop_window, 256, "%s - Wine desktop", argc > 1 ? argv[1] : "Default");
+    if(argc > 2)
+    {
+        release_key = atoi(argv[2]);
+    }
 
     display = XOpenDisplay(0);
     if(display == NULL) {
@@ -78,7 +83,7 @@ int main(int argc, char **argv)
     window = 0;
     for(i=0;i < size / sizeof(Window);i++) {
         XFetchName(display, client_list[i], &window_name);
-        if(strcmp(window_name, WINDOW_NAME) == 0) {
+        if(window_name && strcmp(window_name, desktop_window) == 0) {
             window = client_list[i];
             XFree(window_name);
             break;
@@ -89,7 +94,7 @@ int main(int argc, char **argv)
     XFree(client_list);
 
     if(!window) {
-        fprintf(stderr, "Error: Wine desktop was not found\n");
+        fprintf(stderr, "Error: \"%s\" was not found\n", desktop_window);
         return 1;
     }
 
